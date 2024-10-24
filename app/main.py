@@ -1,17 +1,11 @@
 from fastapi import FastAPI
-from fastapi_users import FastAPIUsers
-
 from app.auth.auth import auth_backend
-from app.auth.manager import get_user_manager
+from app.auth.manager import fastapi_users
 from app.auth.schemas import UserRead, UserCreate
-from app.models import User
+from app.routers import post, comment
 
 app = FastAPI()
 
-fastapi_users = FastAPIUsers[User, int](
-    get_user_manager,
-    [auth_backend],
-)
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
@@ -24,3 +18,7 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
+
+app.include_router(post.router, tags=["posts"])
+
+app.include_router(comment.router, tags=["comments"])
