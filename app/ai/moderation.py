@@ -10,14 +10,14 @@ load_dotenv()
 
 gemini.configure(api_key=os.environ["GEMINI_API_KEY"])
 generation_config = {
-  "max_output_tokens": 10,
+  "max_output_tokens": 500,
   "response_mime_type": "application/json",
 }
 
 MODEL = gemini.GenerativeModel(
   model_name="gemini-1.5-flash",
   generation_config=generation_config,
-  system_instruction="You can only say OK.",
+  system_instruction="You have to moderate the text of posts for insults or profanity. Respond with just one word. If the text contains any of these, return True. If it doesn't - False.",
 )
 
 def is_profane(text: str) -> bool:
@@ -25,16 +25,25 @@ def is_profane(text: str) -> bool:
 
 
 def is_harmful(text: str) -> bool:
-    response = str(MODEL.generate_content(text))
+    try:
+        gemini_response = MODEL.generate_content(text)
 
-    harmful = any(
-        category in response for category in HARM_PROBABILITY
-    )
+        if "true" in gemini_response.text.lower():
+            return True
 
-    return harmful
+        response = str(gemini_response)
+
+        harmful = any(
+            category in response for category in HARM_PROBABILITY
+        )
+        return harmful
+
+    except:
+        return False
 
 
 def is_acceptable_text(text: str) -> bool:
+    print(text)
     if IS_PROFANITY_FORBIDDEN and is_profane(text):
         return False
 
