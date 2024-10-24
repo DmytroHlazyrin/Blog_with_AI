@@ -19,6 +19,13 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 
-
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, User)
+
+async def get_db() -> AsyncSession:
+    """Create a new database session for each request."""
+    db = async_session_maker()
+    try:
+        yield db
+    finally:
+        await db.close()
