@@ -16,6 +16,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     is_verified: bool = Column(Boolean, default=False, nullable=False)
 
     posts = relationship("Post", back_populates="owner")
+    comments = relationship("Comment", back_populates="author")
 
 class Post(Base):
     __tablename__ = "posts"
@@ -24,7 +25,7 @@ class Post(Base):
     content: str = Column(Text)
     created_at: datetime = Column(DateTime, default=datetime.utcnow)
     is_blocked: bool = Column(Boolean, default=False)
-    owner_id: str = Column(ForeignKey("users.id"), index=True)
+    owner_id: int = Column(ForeignKey("users.id"), index=True)
 
     auto_reply: bool = Column(Boolean, default=False)
     auto_reply_delay: int = Column(Integer, default=0)
@@ -40,6 +41,8 @@ class Comment(Base):
     created_at: datetime = Column(DateTime, default=datetime.utcnow)
     is_blocked: bool = Column(Boolean, default=False)
     post_id: int = Column(ForeignKey("posts.id"), index=True)
-    user_id: str = Column(ForeignKey("users.id"), index=True)
+    author_id: int = Column(ForeignKey("users.id"), index=True)
+    parent_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
 
     post = relationship("Post", back_populates="comments")
+    author = relationship("User", back_populates="comments")
