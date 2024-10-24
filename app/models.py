@@ -26,6 +26,9 @@ class Post(Base):
     is_blocked: bool = Column(Boolean, default=False)
     owner_id: str = Column(ForeignKey("users.id"), index=True)
 
+    auto_reply: bool = Column(Boolean, default=False)
+    auto_reply_delay: int = Column(Integer, default=0)
+
     owner = relationship("User", back_populates="posts")
     comments = relationship("Comment", back_populates="post")
 
