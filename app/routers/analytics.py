@@ -12,12 +12,22 @@ from app.database import get_db
 router = APIRouter()
 
 
-@router.get("/comments-daily-breakdown/", response_model=list[schemas.CommentAnalytics])
+@router.get("/comments-daily-breakdown/",
+            response_model=list[schemas.CommentAnalytics])
 async def get_comment_analytics_endpoint(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    sort_order: Literal["asc", "desc"] = "desc",
-    db: AsyncSession = Depends(get_db),
-    user: models.User = Depends(current_user),
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        offset: Optional[int] = 0,
+        limit: Optional[int] = 10,
+        sort_order: Literal["asc", "desc"] = "desc",
+        db: AsyncSession = Depends(get_db),
+        user: models.User = Depends(current_user),
 ) -> list[dict]:
-    return await get_comment_analytics(date_from=date_from, date_to=date_to, db=db, user=user, sort_order=sort_order)
+    return await get_comment_analytics(
+        date_from=date_from,
+        date_to=date_to,
+        db=db, user=user,
+        sort_order=sort_order,
+        limit=limit,
+        offset=offset
+    )

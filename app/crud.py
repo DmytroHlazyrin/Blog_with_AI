@@ -337,6 +337,8 @@ async def get_comment_analytics(
         db: AsyncSession,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
+        offset: Optional[int] = 0,
+        limit: Optional[int] = 10,
         sort_order: Literal["asc", "desc"] = "desc"
 ) -> list[dict]:
     if not user.is_superuser:
@@ -367,7 +369,7 @@ async def get_comment_analytics(
         .order_by(order)
     )
 
-
+    query = query.offset(offset).limit(limit)
 
     result = await db.execute(query)
 
