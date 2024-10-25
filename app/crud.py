@@ -1,13 +1,13 @@
-import asyncio
+from datetime import date
 from typing import Optional, Literal
 
-from fastapi import HTTPException
-from sqlalchemy import asc, desc, select
+from fastapi import HTTPException, BackgroundTasks
+from sqlalchemy import asc, desc, select, func, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app import models, schemas
-from app.ai.auto_reply import auto_reply_comment, schedule_auto_reply
+from app.ai.auto_reply import auto_reply
 from app.ai.moderation import is_acceptable_text
 
 
@@ -121,7 +121,7 @@ async def update_post(
 
     # Post moderation logic
     post_text = post.title + " " + post.content
-    post.is_blocked = not is_acceptable_text(post_text)
+    post.is_blocked = not await is_acceptable_text(post_text)
 
     # Commit the changes
     await db.commit()
@@ -155,9 +155,11 @@ async def delete_post(
 
 async def create_comment(
     post_id: int,
+    parent_id: Optional[int],
     comment: schemas.CommentCreate,
     db: AsyncSession,
     user: models.User,
+    background_tasks: BackgroundTasks,
 ) -> models.Comment:
     """
     Creates a new comment for the given post.
@@ -166,14 +168,23 @@ async def create_comment(
     result = await db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalar_one_or_none()
 
+    if parent_id:
+        parent = await db.execute(select(models.Post).where(models.Comment.id == parent_id))
+        parent_comment = parent.scalar_one_or_none()
+
+        if not parent_comment:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
     if post.is_blocked:
         raise HTTPException(status_code=403, detail="Post is blocked")
 
+
+
     # Create the comment
-    new_comment = models.Comment(**comment.dict(), post_id=post_id, author_id=user.id)
+    new_comment = models.Comment(**comment.dict(), post_id=post_id, author_id=user.id, parent_id=parent_id)
     new_comment_text = new_comment.content
 
     new_comment.is_blocked = not is_acceptable_text(new_comment_text)
@@ -185,8 +196,9 @@ async def create_comment(
     await db.refresh(new_comment)  # Refresh the comment instance with the latest data
 
     # If auto_reply is enabled for the post, schedule an automatic reply
-    if post.auto_reply:
-        await schedule_auto_reply(post, new_comment)
+    if post.auto_reply and not new_comment.is_blocked:
+        delay = post.auto_reply_delay
+        background_tasks.add_task(auto_reply, post, new_comment, delay)
 
     return new_comment
 
@@ -319,3 +331,53 @@ async def get_comment(
 
     return comment
 
+
+async def get_comment_analytics(
+        user: models.User,
+        db: AsyncSession,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        sort_order: Literal["asc", "desc"] = "desc"
+) -> list[dict]:
+    if not user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized to view analytics")
+
+    if date_from is None:
+        date_from = (await db.execute(select(func.date(func.min(models.Comment.created_at))))).scalar()
+    if date_to is None:
+        date_to = str(date.today())
+
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="Invalid date range")
+
+    if sort_order not in ["asc", "desc"]:
+        raise HTTPException(status_code=400, detail="Invalid sort_order field")
+
+    order = asc("date") if sort_order == "asc" else desc("date")
+
+    query = (
+        select(
+            func.date(models.Comment.created_at).label("date"),
+            func.count(models.Comment.id).label("total_comments"),
+            func.sum(func.cast(models.Comment.is_blocked, Integer)).label(
+                "blocked_comments")
+        )
+        .where(func.date(models.Comment.created_at).between(date_from, date_to))
+        .group_by("date")
+        .order_by(order)
+    )
+
+
+
+    result = await db.execute(query)
+
+    stats = [
+        {
+            "date": row.date,
+            "total_comments": row.total_comments,
+            "blocked_comments": row.blocked_comments or 0
+        }
+        for row in result.fetchall()
+    ]
+
+    return stats

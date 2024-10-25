@@ -1,5 +1,7 @@
-from pydantic import BaseModel, condate, field_validator, EmailStr
-from datetime import date, datetime
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class PostBase(BaseModel):
@@ -32,7 +34,7 @@ class CommentBase(BaseModel):
 
 
 class CommentCreate(CommentBase):
-    parent_id: int = None
+    pass
 
 
 class CommentUpdate(CommentBase):
@@ -45,6 +47,13 @@ class CommentRead(CommentBase):
     is_blocked: bool
     post_id: int
     author_id: int
+    parent_id: Optional[int] = None
 
     class Config:
         orm_mode = True
+
+
+class CommentAnalytics(BaseModel):
+    date: str
+    total_comments: int
+    blocked_comments: int

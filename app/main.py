@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.auth.auth import auth_backend
 from app.auth.manager import fastapi_users
 from app.auth.schemas import UserRead, UserCreate
-from app.routers import post, comment
+from app.routers import post, comment, analytics
 
 app = FastAPI()
 
@@ -22,3 +22,5 @@ app.include_router(
 app.include_router(post.router, tags=["posts"])
 
 app.include_router(comment.router, tags=["comments"])
+
+app.include_router(analytics.router, tags=["analytics"])
