@@ -1,16 +1,13 @@
-# from fastapi_users import fastapi_users
 from typing import Optional, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from app.crud import create_post, get_posts, update_post, delete_post, \
-    get_post, create_comment, update_comment, delete_comment, get_comments, \
-    get_comment
+
 from app import models, schemas
 from app.auth.manager import current_user
-from app.database import get_user_db, get_db
-
+from app.crud import create_comment, update_comment, delete_comment, \
+    get_comments, get_comment
+from app.database import get_db
 
 router = APIRouter()
 
@@ -41,10 +38,12 @@ async def get_comment_endpoint(
 async def create_comment_endpoint(
     post_id: int,
     comment: schemas.CommentCreate,
+    background_tasks: BackgroundTasks,
+    parent_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
-    user: models.User = Depends(current_user),
+    user: models.User = Depends(current_user)
 ) -> models.Comment:
-    return await create_comment(post_id=post_id, comment=comment, db=db, user=user)
+    return await create_comment(post_id=post_id, comment=comment, parent_id=parent_id, db=db, user=user, background_tasks=background_tasks)
 
 
 @router.put("/comments/{comment_id}/", response_model=schemas.CommentUpdate)
