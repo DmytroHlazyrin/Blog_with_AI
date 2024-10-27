@@ -1,6 +1,8 @@
+import os
 import contextlib
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from fastapi_users.exceptions import UserAlreadyExists
@@ -10,8 +12,8 @@ from app.auth.schemas import UserCreate
 from app.database import get_user_db, get_async_session
 from app.models import User
 
-
-SECRET = "SECRET"
+load_dotenv()
+SECRET = os.getenv("JWT_SECRET")
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
