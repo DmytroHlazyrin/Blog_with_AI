@@ -18,7 +18,11 @@ generation_config = {
 MODEL = gemini.GenerativeModel(
   model_name="gemini-1.5-flash",
   generation_config=generation_config,
-  system_instruction="You have to moderate the text of posts for insults or profanity. Respond with just one word. If the text contains any of these, return True. If it doesn't - False.",
+  system_instruction="You have to moderate the text of posts "
+                     "for insults or profanity. "
+                     "Respond with just one word. "
+                     "If the text contains any of these, return True. "
+                     "If it doesn't - False.",
 )
 
 

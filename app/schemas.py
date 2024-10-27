@@ -11,6 +11,7 @@ class PostBase(BaseModel):
     auto_reply: bool = False
     auto_reply_delay: int = 0
 
+
 class PostCreate(PostBase):
     pass
 

@@ -2,14 +2,12 @@ from datetime import date
 from typing import Optional, Literal
 
 from fastapi import HTTPException, BackgroundTasks
-from sqlalchemy import asc, desc, select, func, Integer
+from sqlalchemy import asc, desc, select, func, Integer, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 from app import models, schemas
 from app.ai.auto_reply import auto_reply
 from app.ai.moderation import is_acceptable_text
-
 
 
 async def get_posts(
@@ -22,7 +20,7 @@ async def get_posts(
 ) -> list[models.Post]:
     """
     Fetch posts from the database, with optional sorting and pagination.
-    Superusers can see all posts, while regular users can only see unblocked posts.
+    Superusers can see all posts, while users can only see unblocked posts.
     """
     # Start the query, filter if the user is not a superuser
     query = select(models.Post)
@@ -63,7 +61,9 @@ async def get_post(
     """
     Fetches a post by its ID, checking if the user can see it.
     """
-    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        select(models.Post).where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
 
     if not post:
@@ -73,6 +73,7 @@ async def get_post(
         raise HTTPException(status_code=403, detail="Post is blocked")
 
     return post
+
 
 async def create_post(
         post: schemas.PostCreate,
@@ -106,14 +107,17 @@ async def update_post(
     Updates an existing post with the provided data.
     """
     # Fetch the post by its ID
-    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        select(models.Post).where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
     if post.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this post")
+        raise HTTPException(status_code=403,
+                            detail="Not authorized to update this post")
 
     # Update the post fields
     for key, value in updated_data.dict(exclude_unset=True).items():
@@ -121,7 +125,7 @@ async def update_post(
 
     # Post moderation logic
     post_text = post.title + " " + post.content
-    post.is_blocked = not await is_acceptable_text(post_text)
+    post.is_blocked = not is_acceptable_text(post_text)
 
     # Commit the changes
     await db.commit()
@@ -139,14 +143,21 @@ async def delete_post(
     Deletes a post by its ID.
     """
     # Fetch the post by its ID
-    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        select(models.Post).where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
     if post.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+        raise HTTPException(status_code=403,
+                            detail="Not authorized to delete this post")
+
+    await db.execute(
+        delete(models.Comment).where(models.Comment.post_id == post_id)
+    )
 
     # Delete the post
     await db.delete(post)
@@ -165,15 +176,20 @@ async def create_comment(
     Creates a new comment for the given post.
     """
     # Fetch the post by its ID
-    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        select(models.Post).where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
 
     if parent_id:
-        parent = await db.execute(select(models.Post).where(models.Comment.id == parent_id))
+        parent = await db.execute(
+            select(models.Post).where(models.Comment.id == parent_id)
+        )
         parent_comment = parent.scalar_one_or_none()
 
         if not parent_comment:
-            raise HTTPException(status_code=404, detail="Parent comment not found")
+            raise HTTPException(status_code=404,
+                                detail="Parent comment not found")
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -181,19 +197,20 @@ async def create_comment(
     if post.is_blocked:
         raise HTTPException(status_code=403, detail="Post is blocked")
 
-
-
     # Create the comment
-    new_comment = models.Comment(**comment.dict(), post_id=post_id, author_id=user.id, parent_id=parent_id)
+    new_comment = models.Comment(
+        **comment.dict(),
+        post_id=post_id,
+        author_id=user.id,
+        parent_id=parent_id
+    )
     new_comment_text = new_comment.content
 
     new_comment.is_blocked = not is_acceptable_text(new_comment_text)
-    # new_comment.post_id = post_id
-    # new_comment.author_id = user.id
 
     db.add(new_comment)
     await db.commit()
-    await db.refresh(new_comment)  # Refresh the comment instance with the latest data
+    await db.refresh(new_comment)
 
     # If auto_reply is enabled for the post, schedule an automatic reply
     if post.auto_reply and not new_comment.is_blocked:
@@ -213,14 +230,17 @@ async def update_comment(
     Updates an existing comment with the provided data.
     """
     # Fetch the comment by its ID
-    result = await db.execute(select(models.Comment).where(models.Comment.id == comment_id))
+    result = await db.execute(
+        select(models.Comment).where(models.Comment.id == comment_id)
+    )
     comment = result.scalar_one_or_none()
 
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
     if comment.author_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this comment")
+        raise HTTPException(status_code=403,
+                            detail="Not authorized to update this comment")
 
     # Update the comment fields
     for key, value in updated_data.dict(exclude_unset=True).items():
@@ -232,7 +252,7 @@ async def update_comment(
 
     # Commit the changes
     await db.commit()
-    await db.refresh(comment)  # Refresh the comment instance with the latest data
+    await db.refresh(comment)
     return comment
 
 
@@ -245,14 +265,17 @@ async def delete_comment(
     Deletes a post by its ID.
     """
     # Fetch the post by its ID
-    result = await db.execute(select(models.Comment).where(models.Comment.id == comment_id))
+    result = await db.execute(
+        select(models.Comment).where(models.Comment.id == comment_id)
+    )
     comment = result.scalar_one_or_none()
 
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
     if comment.author_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+        raise HTTPException(status_code=403,
+                            detail="Not authorized to delete this comment")
 
     # Delete the post
     await db.delete(comment)
@@ -265,14 +288,16 @@ async def get_comments(
     user: models.User,
     offset: int = 0,
     limit: int = 10,
-    sort_by: Literal["date", "author"] = "date",
+    sort_by: Literal["created_at", "author_id"] = None,
     sort_order: Literal["asc", "desc"] = "asc"
 ) -> list[models.Comment]:
     """
     Fetches comments for a given post.
     """
     # Fetch the post by its ID
-    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        select(models.Post).where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
 
     if not post:
@@ -289,8 +314,8 @@ async def get_comments(
 
     if sort_by:
         if sort_by == "author_id":
-            order = asc(models.Comment.author_id) if sort_order == "asc" else desc(
-                models.Comment.author_id)
+            order = asc(models.Comment.author_id) if sort_order == "asc" else (
+                desc(models.Comment.author_id))
         elif sort_by == "created_at":
             order = asc(
                 models.Comment.created_at) if sort_order == "asc" else desc(
@@ -300,7 +325,6 @@ async def get_comments(
                                 detail="Invalid sort_by field")
 
         query = query.order_by(order)
-
 
     # Apply pagination (offset and limit)
     query = query.offset(offset).limit(limit)
@@ -320,7 +344,9 @@ async def get_comment(
     """
     Fetches a comment by its ID.
     """
-    result = await db.execute(select(models.Comment).where(models.Comment.id == comment_id))
+    result = await db.execute(
+        select(models.Comment).where(models.Comment.id == comment_id)
+    )
     comment = result.scalar_one_or_none()
 
     if not comment:
@@ -342,10 +368,13 @@ async def get_comment_analytics(
         sort_order: Literal["asc", "desc"] = "desc"
 ) -> list[dict]:
     if not user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not authorized to view analytics")
+        raise HTTPException(status_code=403,
+                            detail="Not authorized to view analytics")
 
     if date_from is None:
-        date_from = (await db.execute(select(func.date(func.min(models.Comment.created_at))))).scalar()
+        date_from = (await db.execute(
+            select(func.date(func.min(models.Comment.created_at)))
+        )).scalar()
     if date_to is None:
         date_to = str(date.today())
 
@@ -364,8 +393,9 @@ async def get_comment_analytics(
             func.sum(func.cast(models.Comment.is_blocked, Integer)).label(
                 "blocked_comments")
         )
-        .where(func.date(models.Comment.created_at).between(date_from, date_to))
-        .group_by("date")
+        .where(
+            func.date(models.Comment.created_at).between(date_from, date_to)
+        ).group_by("date")
         .order_by(order)
     )
 

@@ -22,16 +22,22 @@ MODEL = gemini.GenerativeModel(
 )
 
 
-async def auto_reply_comment(post: models.Post, comment: models.Comment) -> str:
-    text = f"Post title: {post.title}\nPost content: {post.content}\nComment: {comment.content}"
+async def auto_reply_comment(post: models.Post, comment: models.Comment):
+    text = (f"Post title: {post.title}\n"
+            f"Post content: {post.content}\nComment: {comment.content}")
     try:
         response = MODEL.generate_content(text).text
     except:
-        response = "Thanks for your comment!" # In case of error, use a default message
+        # In case of error, use a default message
+        response = "Thanks for your comment!"
     return response
 
 
-async def auto_reply(post: models.Post, comment: models.Comment, delay) -> None:
+async def auto_reply(
+        post: models.Post,
+        comment: models.Comment,
+        delay
+) -> None:
     """
     Automatically replies to a comment on a post.
     """

@@ -1,10 +1,12 @@
-from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTable
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
-Base = declarative_base()
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTable
+from sqlalchemy import (Column, String, Text, DateTime, Integer, ForeignKey,
+                        Boolean)
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
 
 class User(SQLAlchemyBaseUserTable[int], Base):
     __tablename__ = "users"
@@ -17,6 +19,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     posts = relationship("Post", back_populates="owner")
     comments = relationship("Comment", back_populates="author")
+
 
 class Post(Base):
     __tablename__ = "posts"
