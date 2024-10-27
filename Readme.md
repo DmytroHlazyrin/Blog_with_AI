@@ -52,6 +52,7 @@ Start the application with:
    uvicorn app.main:app --reload
    ```
 The API will be accessible at http://127.0.0.1:8000.
+Docs for API will be accessible at http://127.0.0.1:8000/docs.
 
 ## Configurations
 You could change gemini instructions for auto replying in app/ai/config.py
